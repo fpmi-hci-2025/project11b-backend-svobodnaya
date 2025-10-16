@@ -1,0 +1,121 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  code-quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+      
+      - name: Install dependencies
+        run: poetry install --no-interaction
+      
+      - name: Run Black
+        run: poetry run black --check app tests
+      
+      - name: Run Flake8
+        run: poetry run flake8 app tests --max-line-length=120
+
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    needs: code-quality
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+      
+      - name: Install dependencies
+        run: poetry install --no-interaction
+      
+      - name: Run pytest
+        run: poetry run pytest tests/ -v --tb=short
+
+  build-and-test:
+    name: Build Docker & Integration Tests
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Build Docker image
+        run: docker build -t fastapi-demo:${{ github.sha }} .
+      
+      - name: Run container
+        run: |
+          docker run -d -p 8000:8000 --name test-container fastapi-demo:${{ github.sha }}
+          sleep 10
+      
+      - name: Integration test - Healthcheck
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/healthcheck)
+          if [ $response -eq 200 ]; then
+            echo "Healthcheck passed"
+          else
+            echo "Healthcheck failed with status code: $response"
+            exit 1
+          fi
+      
+      - name: Stop container
+        if: always()
+        run: docker stop test-container && docker rm test-container
+
+  generate-openapi:
+    name: Generate OpenAPI Specification
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+      
+      - name: Install dependencies
+        run: poetry install --no-interaction --only main
+      
+      - name: Generate OpenAPI JSON
+        run: |
+          mkdir -p docs
+          poetry run python -c "
+          from app.main import app
+          import json
+          with open('docs/openapi.json', 'w') as f:
+              json.dump(app.openapi(), f, indent=2)
+          "
+      
+      - name: Upload OpenAPI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-spec
+          path: docs/openapi.json
