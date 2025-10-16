@@ -1,0 +1,1367 @@
+openapi: 3.0.0
+info:
+  title: Система управления проектами API (обновленная)
+  description: REST API для системы управления проектами с регистрацией через email и ролевой моделью
+  version: 2.0.0
+  contact:
+    email: project-management@example.com
+
+servers:
+  - description: Development server
+    url: http://localhost:8000/api/v1
+
+tags:
+  - name: auth
+    description: Аутентификация и регистрация
+  - name: projects
+    description: Управление проектами
+  - name: team
+    description: Управление командой
+  - name: tasks
+    description: Управление задачами
+  - name: comments
+    description: Комментарии к задачам
+  - name: references
+    description: Справочники
+
+paths:
+  /auth/register:
+    post:
+      tags:
+        - auth
+      summary: Регистрация нового пользователя
+      description: Создание новой учетной записи с отправкой email для подтверждения
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Пользователь зарегистрирован, отправлено письмо для подтверждения
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Регистрация успешна. Проверьте email для подтверждения."
+                  email:
+                    type: string
+                    example: "user@example.com"
+        '400':
+          description: Некорректные данные
+        '409':
+          description: Пользователь с таким email уже существует
+
+  /auth/verify/{token}:
+    get:
+      tags:
+        - auth
+      summary: Подтверждение email
+      description: Активация учетной записи по токену из email
+      parameters:
+        - in: path
+          name: token
+          required: true
+          schema:
+            type: string
+          description: Токен подтверждения из email
+      responses:
+        '200':
+          description: Email успешно подтвержден, аккаунт активирован
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Email подтвержден. Можете войти в систему."
+        '400':
+          description: Неверный или истекший токен
+        '404':
+          description: Токен не найден
+
+  /auth/login:
+    post:
+      tags:
+        - auth
+      summary: Вход в систему
+      description: Аутентификация пользователя и получение JWT-токена
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Успешная аутентификация
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...; Path=/; HttpOnly; Secure; SameSite=Strict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Неверные учетные данные или аккаунт не активирован
+        '500':
+          description: Внутренняя ошибка сервера
+
+  /auth/logout:
+    post:
+      tags:
+        - auth
+      summary: Выход из системы
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Успешный выход
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Выход выполнен успешно"
+
+  /auth/me:
+    get:
+      tags:
+        - auth
+      summary: Получить информацию о текущем пользователе
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Информация о пользователе
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Не авторизован
+
+    put:
+      tags:
+        - auth
+      summary: Обновить профиль пользователя
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: Профиль обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Некорректные данные
+
+  /projects:
+    get:
+      tags:
+        - projects
+      summary: Получить список проектов пользователя
+      description: Возвращает проекты, где пользователь является владельцем или участником
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [active, completed, archived]
+          description: Фильтр по статусу проекта
+        - in: query
+          name: role
+          schema:
+            type: string
+            enum: [owner, member]
+          description: Фильтр по роли (владелец или участник)
+      responses:
+        '200':
+          description: Список проектов
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProjectListItem'
+        '401':
+          description: Не авторизован
+
+    post:
+      tags:
+        - projects
+      summary: Создать новый проект (доску задач)
+      description: Создание нового проекта, пользователь автоматически становится владельцем
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProjectRequest'
+      responses:
+        '201':
+          description: Проект успешно создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          description: Некорректные данные
+        '401':
+          description: Не авторизован
+
+  /projects/{id}:
+    get:
+      tags:
+        - projects
+      summary: Получить детали проекта
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: ID проекта
+      responses:
+        '200':
+          description: Детали проекта
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectDetails'
+        '403':
+          description: Нет доступа к проекту
+        '404':
+          description: Проект не найден
+        '401':
+          description: Не авторизован
+
+    put:
+      tags:
+        - projects
+      summary: Обновить проект (только владелец)
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProjectRequest'
+      responses:
+        '200':
+          description: Проект успешно обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          description: Некорректные данные
+        '403':
+          description: Только владелец может изменять проект
+        '404':
+          description: Проект не найден
+
+    delete:
+      tags:
+        - projects
+      summary: Удалить проект (только владелец)
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Проект успешно удален
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Проект успешно удален"
+        '403':
+          description: Только владелец может удалять проект
+        '404':
+          description: Проект не найден
+
+  /projects/{id}/transfer-ownership:
+    post:
+      tags:
+        - projects
+      summary: Передать права владельца другому участнику
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - new_owner_id
+              properties:
+                new_owner_id:
+                  type: integer
+                  description: ID нового владельца (должен быть участником проекта)
+                  example: 5
+      responses:
+        '200':
+          description: Права владельца переданы
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Права владельца переданы"
+                  new_owner:
+                    $ref: '#/components/schemas/User'
+        '400':
+          description: Пользователь не является участником проекта
+        '403':
+          description: Только владелец может передавать права
+        '404':
+          description: Проект или пользователь не найден
+
+  /projects/{id}/members:
+    get:
+      tags:
+        - team
+      summary: Получить список участников проекта
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: ID проекта
+      responses:
+        '200':
+          description: Список участников
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TeamMember'
+        '403':
+          description: Нет доступа к проекту
+        '404':
+          description: Проект не найден
+
+    post:
+      tags:
+        - team
+      summary: Добавить участника в проект (только владелец)
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTeamMemberRequest'
+      responses:
+        '201':
+          description: Участник добавлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamMember'
+        '400':
+          description: Некорректные данные или пользователь не найден
+        '403':
+          description: Только владелец может добавлять участников
+        '404':
+          description: Проект не найден
+        '409':
+          description: Участник уже в проекте
+
+  /projects/{id}/members/{memberId}:
+    put:
+      tags:
+        - team
+      summary: Изменить роль участника (только владелец)
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: memberId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTeamMemberRequest'
+      responses:
+        '200':
+          description: Роль участника обновлена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamMember'
+        '403':
+          description: Только владелец может изменять роли
+        '404':
+          description: Участник не найден
+
+    delete:
+      tags:
+        - team
+      summary: Удалить участника из проекта (только владелец)
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: memberId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Участник удален
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Участник удален из проекта"
+        '400':
+          description: Нельзя удалить владельца проекта
+        '403':
+          description: Только владелец может удалять участников
+        '404':
+          description: Участник не найден
+
+  /projects/{id}/tasks:
+    get:
+      tags:
+        - tasks
+      summary: Получить список задач проекта
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: ID проекта
+        - in: query
+          name: status
+          schema:
+            type: integer
+          description: Фильтр по статусу задачи
+        - in: query
+          name: type
+          schema:
+            type: integer
+          description: Фильтр по типу задачи
+        - in: query
+          name: assignee
+          schema:
+            type: integer
+          description: Фильтр по исполнителю
+        - in: query
+          name: priority
+          schema:
+            type: string
+            enum: [low, medium, high]
+          description: Фильтр по приоритету
+        - in: query
+          name: due_date_from
+          schema:
+            type: string
+            format: date
+          description: Фильтр по сроку выполнения (от)
+        - in: query
+          name: due_date_to
+          schema:
+            type: string
+            format: date
+          description: Фильтр по сроку выполнения (до)
+      responses:
+        '200':
+          description: Список задач
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+        '403':
+          description: Нет доступа к проекту
+        '404':
+          description: Проект не найден
+
+    post:
+      tags:
+        - tasks
+      summary: Создать новую задачу
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskRequest'
+      responses:
+        '201':
+          description: Задача создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          description: Некорректные данные
+        '403':
+          description: Нет доступа к проекту
+        '404':
+          description: Проект не найден
+
+  /projects/{id}/tasks/{taskId}:
+    get:
+      tags:
+        - tasks
+      summary: Получить детали задачи
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Детали задачи
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskDetails'
+        '403':
+          description: Нет доступа к проекту
+        '404':
+          description: Задача не найдена
+
+    put:
+      tags:
+        - tasks
+      summary: Обновить задачу
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTaskRequest'
+      responses:
+        '200':
+          description: Задача обновлена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          description: Некорректные данные
+        '403':
+          description: Нет доступа к проекту
+        '404':
+          description: Задача не найдена
+
+    delete:
+      tags:
+        - tasks
+      summary: Удалить задачу (только владелец проекта)
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Задача удалена
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Задача успешно удалена"
+        '403':
+          description: Только владелец проекта может удалять задачи
+        '404':
+          description: Задача не найдена
+
+  /projects/{id}/tasks/{taskId}/status:
+    patch:
+      tags:
+        - tasks
+      summary: Изменить статус задачи
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTaskStatusRequest'
+      responses:
+        '200':
+          description: Статус задачи обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          description: Некорректные данные
+        '403':
+          description: Нет доступа к проекту
+        '404':
+          description: Задача не найдена
+
+  /projects/{id}/board:
+    get:
+      tags:
+        - tasks
+      summary: Получить доску задач (Kanban)
+      description: Возвращает задачи, сгруппированные по статусам для визуализации в виде доски
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Доска задач
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskBoard'
+        '403':
+          description: Нет доступа к проекту
+        '404':
+          description: Проект не найден
+
+  /tasks/{taskId}/comments:
+    get:
+      tags:
+        - comments
+      summary: Получить комментарии к задаче
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Список комментариев
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Comment'
+        '403':
+          description: Нет доступа к задаче
+        '404':
+          description: Задача не найдена
+
+    post:
+      tags:
+        - comments
+      summary: Добавить комментарий к задаче
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - content
+              properties:
+                content:
+                  type: string
+                  example: "Отличная работа! Можно добавить валидацию форм."
+      responses:
+        '201':
+          description: Комментарий добавлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+        '400':
+          description: Некорректные данные
+        '403':
+          description: Нет доступа к задаче
+        '404':
+          description: Задача не найдена
+
+  /tasks/{taskId}/comments/{commentId}:
+    put:
+      tags:
+        - comments
+      summary: Обновить комментарий (только автор)
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: commentId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - content
+              properties:
+                content:
+                  type: string
+      responses:
+        '200':
+          description: Комментарий обновлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+        '403':
+          description: Только автор может изменять комментарий
+        '404':
+          description: Комментарий не найден
+
+    delete:
+      tags:
+        - comments
+      summary: Удалить комментарий (автор или владелец проекта)
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: commentId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Комментарий удален
+        '403':
+          description: Нет прав на удаление
+        '404':
+          description: Комментарий не найден
+
+  /task-types:
+    get:
+      tags:
+        - references
+      summary: Получить список типов задач
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Список типов задач
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaskType'
+
+  /task-statuses:
+    get:
+      tags:
+        - references
+      summary: Получить список статусов задач
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Список статусов задач
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaskStatus'
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: token
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+        - full_name
+      properties:
+        email:
+          type: string
+          format: email
+          example: ivan@example.com
+        password:
+          type: string
+          format: password
+          minLength: 8
+          example: SecurePassword123!
+        full_name:
+          type: string
+          example: Иван Петров
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: ivan@example.com
+        password:
+          type: string
+          format: password
+          example: SecurePassword123!
+
+    LoginResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        message:
+          type: string
+          example: "Вход выполнен успешно"
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        full_name:
+          type: string
+          example: Иван Петрович Петров
+        avatar_url:
+          type: string
+          format: uri
+          example: https://example.com/avatars/user123.jpg
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        email:
+          type: string
+          example: ivan@example.com
+        full_name:
+          type: string
+          example: Иван Петров
+        is_active:
+          type: boolean
+          example: true
+        avatar_url:
+          type: string
+          example: https://example.com/avatars/user123.jpg
+        created_at:
+          type: string
+          format: date-time
+
+    CreateProjectRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          example: Разработка веб-приложения
+        description:
+          type: string
+          example: Проект по созданию системы управления проектами
+        start_date:
+          type: string
+          format: date
+          example: 2025-01-01
+        end_date:
+          type: string
+          format: date
+          example: 2025-06-30
+
+    UpdateProjectRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [active, completed, archived]
+
+    Project:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Разработка веб-приложения
+        description:
+          type: string
+          example: Проект по созданию системы управления проектами
+        start_date:
+          type: string
+          format: date
+          example: 2025-01-01
+        end_date:
+          type: string
+          format: date
+          example: 2025-06-30
+        status:
+          type: string
+          enum: [active, completed, archived]
+          example: active
+        owner_id:
+          type: integer
+          example: 1
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ProjectListItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Разработка веб-приложения
+        description:
+          type: string
+          example: Проект по созданию системы управления проектами
+        status:
+          type: string
+          example: active
+        is_owner:
+          type: boolean
+          description: Является ли текущий пользователь владельцем
+          example: true
+        my_role:
+          type: string
+          description: Роль текущего пользователя в проекте
+          example: Владелец
+        members_count:
+          type: integer
+          example: 5
+        tasks_count:
+          type: integer
+          example: 23
+        created_at:
+          type: string
+          format: date-time
+
+    ProjectDetails:
+      allOf:
+        - $ref: '#/components/schemas/Project'
+        - type: object
+          properties:
+            owner:
+              $ref: '#/components/schemas/User'
+            is_owner:
+              type: boolean
+              description: Является ли текущий пользователь владельцем
+              example: true
+            my_role:
+              type: string
+              description: Роль текущего пользователя
+              example: Владелец
+            members_count:
+              type: integer
+              example: 5
+            tasks_count:
+              type: integer
+              example: 23
+            tasks_by_status:
+              type: object
+              properties:
+                new:
+                  type: integer
+                  example: 5
+                in_progress:
+                  type: integer
+                  example: 8
+                ready:
+                  type: integer
+                  example: 7
+                closed:
+                  type: integer
+                  example: 3
+
+    AddTeamMemberRequest:
+      type: object
+      required:
+        - email
+        - role
+      properties:
+        email:
+          type: string
+          format: email
+          description: Email пользователя для добавления
+          example: developer@example.com
+        role:
+          type: string
+          example: Backend Developer
+
+    UpdateTeamMemberRequest:
+      type: object
+      required:
+        - role
+      properties:
+        role:
+          type: string
+          example: Lead Developer
+
+    TeamMember:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        project_id:
+          type: integer
+          example: 1
+        user:
+          $ref: '#/components/schemas/User'
+        role:
+          type: string
+          example: Backend Developer
+        is_owner:
+          type: boolean
+          example: false
+        joined_at:
+          type: string
+          format: date-time
+
+    CreateTaskRequest:
+      type: object
+      required:
+        - title
+        - type_id
+      properties:
+        title:
+          type: string
+          example: Реализовать API аутентификации
+        description:
+          type: string
+          example: Создать endpoints для регистрации и входа пользователей
+        type_id:
+          type: integer
+          example: 1
+        assignee_id:
+          type: integer
+          example: 2
+        due_date:
+          type: string
+          format: date
+          example: 2025-02-01
+        priority:
+          type: string
+          enum: [low, medium, high]
+          default: medium
+          example: high
+
+    UpdateTaskRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        type_id:
+          type: integer
+        status_id:
+          type: integer
+        assignee_id:
+          type: integer
+        due_date:
+          type: string
+          format: date
+        priority:
+          type: string
+          enum: [low, medium, high]
+
+    UpdateTaskStatusRequest:
+      type: object
+      required:
+        - status_id
+      properties:
+        status_id:
+          type: integer
+          example: 2
+          description: ID нового статуса (1-новая, 2-в работе, 3-готова, 4-закрыта)
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        project_id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: Реализовать API аутентификации
+        description:
+          type: string
+          example: Создать endpoints для регистрации и входа пользователей
+        type:
+          $ref: '#/components/schemas/TaskType'
+        status:
+          $ref: '#/components/schemas/TaskStatus'
+        assignee:
+          $ref: '#/components/schemas/User'
+        created_by:
+          type: integer
+          example: 1
+        due_date:
+          type: string
+          format: date
+          example: 2025-02-01
+        priority:
+          type: string
+          enum: [low, medium, high]
+          example: high
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TaskDetails:
+      allOf:
+        - $ref: '#/components/schemas/Task'
+        - type: object
+          properties:
+            creator:
+              $ref: '#/components/schemas/User'
+            comments_count:
+              type: integer
+              example: 5
+
+    TaskType:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: задача
+        color:
+          type: string
+          example: "#3b82f6"
+
+    TaskStatus:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: новая
+        order_index:
+          type: integer
+          example: 1
+        color:
+          type: string
+          example: "#94a3b8"
+
+    TaskBoard:
+      type: object
+      properties:
+        project_id:
+          type: integer
+          example: 1
+        columns:
+          type: array
+          items:
+            type: object
+            properties:
+              status:
+                $ref: '#/components/schemas/TaskStatus'
+              tasks:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        task_id:
+          type: integer
+          example: 1
+        user:
+          $ref: '#/components/schemas/User'
+        content:
+          type: string
+          example: "Отличная работа! Можно добавить валидацию форм."
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
