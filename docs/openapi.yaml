@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
-  title: Система управления проектами API (обновленная)
-  description: REST API для системы управления проектами с регистрацией через email и ролевой моделью
+  title: Система управления проектами
+  description: REST API для системы управления проектами
   version: 2.0.0
   contact:
     email: project-management@example.com
