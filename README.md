@@ -40,3 +40,7 @@ GitHub Actions автоматически:
 - Выполняет интеграционные тесты
 - Генерирует OpenAPI спецификацию
 - Публикует документацию на GitHub Pages
+
+## GitHub Pages
+
+API документация доступна по адресу: https://fpmi-hci-2025.github.io/project11b-backend-svobodnaya/
