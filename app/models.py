@@ -28,10 +28,18 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    owned_projects = relationship("Project", back_populates="owner", cascade="all, delete-orphan")
-    project_memberships = relationship("ProjectMember", back_populates="user", cascade="all, delete-orphan")
-    assigned_tasks = relationship("Task", back_populates="assignee", foreign_keys="Task.assignee_id")
-    created_tasks = relationship("Task", back_populates="creator", foreign_keys="Task.creator_id")
+    owned_projects = relationship(
+        "Project", back_populates="owner", cascade="all, delete-orphan"
+    )
+    project_memberships = relationship(
+        "ProjectMember", back_populates="user", cascade="all, delete-orphan"
+    )
+    assigned_tasks = relationship(
+        "Task", back_populates="assignee", foreign_keys="Task.assignee_id"
+    )
+    created_tasks = relationship(
+        "Task", back_populates="creator", foreign_keys="Task.creator_id"
+    )
 
 
 class Project(Base):
@@ -45,7 +53,9 @@ class Project(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     owner = relationship("User", back_populates="owned_projects")
-    members = relationship("ProjectMember", back_populates="project", cascade="all, delete-orphan")
+    members = relationship(
+        "ProjectMember", back_populates="project", cascade="all, delete-orphan"
+    )
     tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
 
 
@@ -68,7 +78,9 @@ class Task(Base):
     title = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
     status = Column(Enum(TaskStatus), default=TaskStatus.TODO, nullable=False)
-    complexity = Column(Enum(TaskComplexity), default=TaskComplexity.MEDIUM, nullable=False)
+    complexity = Column(
+        Enum(TaskComplexity), default=TaskComplexity.MEDIUM, nullable=False
+    )
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     creator_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     assignee_id = Column(Integer, ForeignKey("users.id"), nullable=True)
@@ -76,6 +88,9 @@ class Task(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     project = relationship("Project", back_populates="tasks")
-    creator = relationship("User", back_populates="created_tasks", foreign_keys=[creator_id])
-    assignee = relationship("User", back_populates="assigned_tasks", foreign_keys=[assignee_id])
-
+    creator = relationship(
+        "User", back_populates="created_tasks", foreign_keys=[creator_id]
+    )
+    assignee = relationship(
+        "User", back_populates="assigned_tasks", foreign_keys=[assignee_id]
+    )

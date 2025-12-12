@@ -43,8 +43,7 @@ app.include_router(users.router)
 async def healthcheck():
     """Health check endpoint"""
     return JSONResponse(
-        status_code=200,
-        content={"status": "healthy", "service": "taskflow-api"}
+        status_code=200, content={"status": "healthy", "service": "taskflow-api"}
     )
 
 

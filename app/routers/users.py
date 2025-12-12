@@ -14,14 +14,11 @@ router = APIRouter(prefix="/api/users", tags=["users"])
 async def search_users(
     q: str = Query(..., min_length=1, description="Search query for username"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Search users by username (for adding members to projects)"""
     search_pattern = f"%{q}%"
     result = await db.execute(
-        select(User)
-        .where(User.username.ilike(search_pattern))
-        .limit(10)
+        select(User).where(User.username.ilike(search_pattern)).limit(10)
     )
     return result.scalars().all()
-

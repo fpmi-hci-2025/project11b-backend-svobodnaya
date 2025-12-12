@@ -128,4 +128,3 @@ class TaskResponse(TaskBase):
 # Member management
 class AddMemberRequest(BaseModel):
     user_id: int
-
