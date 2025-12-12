@@ -43,4 +43,4 @@ GitHub Actions автоматически:
 
 ## GitHub Pages
 
-API документация доступна по адресу: https://fpmi-hci-2025.github.io/project11b-backend-svobodnaya/
+API документация доступна по адресу: https://project11b-backend-svobodnaya.onrender.com/docs
