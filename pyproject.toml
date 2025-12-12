@@ -1,19 +1,27 @@
 [tool.poetry]
-name = "pulse"
+name = "taskflow"
 version = "0.1.0"
-description = ""
+description = "Project Management Application Backend"
 authors = ["redfox193 <goncharov.sergei.21@gmail.com>"]
 readme = "README.md"
 package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.12"
-fastapi = "^0.104.1"
-uvicorn = {extras = ["standard"], version = "^0.24.0"}
-pydantic-settings = "^2.0.3"
+fastapi = "^0.115.0"
+uvicorn = {extras = ["standard"], version = "^0.32.0"}
+pydantic = "^2.9.0"
+pydantic-settings = "^2.6.0"
+sqlalchemy = "^2.0.35"
+asyncpg = "^0.30.0"
+alembic = "^1.14.0"
+bcrypt = "^4.2.0"
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+python-multipart = "^0.0.12"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.3"
+pytest-asyncio = "^0.21.1"
 httpx = "^0.25.1"
 black = "^23.11.0"
 flake8 = "^6.1.0"
