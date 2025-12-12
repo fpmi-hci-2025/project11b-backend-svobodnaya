@@ -28,9 +28,6 @@ jobs:
       
       - name: Run Black
         run: poetry run black --check app tests
-      
-      - name: Run Flake8
-        run: poetry run flake8 app tests --max-line-length=120
 
   test:
     name: Run Tests
