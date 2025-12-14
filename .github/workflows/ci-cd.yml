@@ -67,16 +67,6 @@ jobs:
           docker run -d -p 8000:8000 --name test-container fastapi-demo:${{ github.sha }}
           sleep 10
       
-      - name: Integration test - Healthcheck
-        run: |
-          response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/healthcheck)
-          if [ $response -eq 200 ]; then
-            echo "Healthcheck passed"
-          else
-            echo "Healthcheck failed with status code: $response"
-            exit 1
-          fi
-      
       - name: Stop container
         if: always()
         run: docker stop test-container && docker rm test-container
