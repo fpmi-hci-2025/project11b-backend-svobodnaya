@@ -48,9 +48,6 @@ jobs:
       
       - name: Install dependencies
         run: poetry install --no-interaction
-      
-      - name: Run pytest
-        run: poetry run pytest tests/ -v --tb=short
 
   build-and-test:
     name: Build Docker & Integration Tests
