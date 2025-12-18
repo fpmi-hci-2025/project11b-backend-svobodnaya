@@ -264,7 +264,11 @@ class TestProjectMembers:
         assert response.status_code == 404
 
     async def test_add_member_not_owner(
-        self, client: AsyncClient, auth_headers_user2, test_project_with_member, test_user3
+        self,
+        client: AsyncClient,
+        auth_headers_user2,
+        test_project_with_member,
+        test_user3,
     ):
         """Test adding member as non-owner (should fail)."""
         response = await client.post(
@@ -306,4 +310,3 @@ class TestProjectMembers:
         data = response.json()
         assert len(data) == 1
         assert data[0]["user"]["username"] == "testuser2"
-

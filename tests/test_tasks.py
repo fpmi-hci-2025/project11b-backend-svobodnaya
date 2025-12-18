@@ -278,7 +278,12 @@ class TestUpdateTask:
         assert response.status_code == 403
 
     async def test_update_task_as_member(
-        self, client: AsyncClient, auth_headers_user2, test_project_with_member, db_session, test_user
+        self,
+        client: AsyncClient,
+        auth_headers_user2,
+        test_project_with_member,
+        db_session,
+        test_user,
     ):
         """Test updating task as member."""
         from app.models import Task, TaskStatus, TaskComplexity
@@ -342,4 +347,3 @@ class TestDeleteTask:
             headers=auth_headers_user2,
         )
         assert response.status_code == 403
-

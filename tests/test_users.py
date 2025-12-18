@@ -36,14 +36,14 @@ class TestSearchUsers:
         self, client: AsyncClient, auth_headers, test_user
     ):
         """Test case-insensitive search."""
-        response = await client.get("/api/users/search?q=TESTUSER", headers=auth_headers)
+        response = await client.get(
+            "/api/users/search?q=TESTUSER", headers=auth_headers
+        )
         assert response.status_code == 200
         data = response.json()
         assert len(data) >= 1
 
-    async def test_search_users_no_results(
-        self, client: AsyncClient, auth_headers
-    ):
+    async def test_search_users_no_results(self, client: AsyncClient, auth_headers):
         """Test search with no results."""
         response = await client.get(
             "/api/users/search?q=nonexistentuser12345", headers=auth_headers
@@ -51,9 +51,7 @@ class TestSearchUsers:
         assert response.status_code == 200
         assert response.json() == []
 
-    async def test_search_users_empty_query(
-        self, client: AsyncClient, auth_headers
-    ):
+    async def test_search_users_empty_query(self, client: AsyncClient, auth_headers):
         """Test search with empty query."""
         response = await client.get("/api/users/search?q=", headers=auth_headers)
         assert response.status_code == 422  # Validation error (min_length=1)
@@ -63,10 +61,7 @@ class TestSearchUsers:
         response = await client.get("/api/users/search?q=test")
         assert response.status_code == 401
 
-    async def test_search_users_missing_query(
-        self, client: AsyncClient, auth_headers
-    ):
+    async def test_search_users_missing_query(self, client: AsyncClient, auth_headers):
         """Test search without query parameter."""
         response = await client.get("/api/users/search", headers=auth_headers)
         assert response.status_code == 422
-

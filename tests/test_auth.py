@@ -114,4 +114,3 @@ class TestMe:
             "/api/auth/me", headers={"Authorization": "Bearer invalidtoken"}
         )
         assert response.status_code == 401
-

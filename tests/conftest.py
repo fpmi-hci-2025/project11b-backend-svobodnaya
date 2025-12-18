@@ -178,4 +178,3 @@ async def test_task(
     await db_session.commit()
     await db_session.refresh(task)
     return task
-
